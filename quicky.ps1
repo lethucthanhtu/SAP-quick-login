@@ -170,7 +170,7 @@ function Show-Menu {
 
             # $items.Add([PSCustomObject]@{ System = $sys; Client = $c })
             $obj = New-Object -TypeName PSObject -Property @{ System = $sys; Client = $c }
-            [void]$items.Add($obj)
+            $items.Add($obj)
             
             $i++
             $anyShown = $true
