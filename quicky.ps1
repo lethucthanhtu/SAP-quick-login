@@ -144,7 +144,8 @@ function Show-Menu {
     Write-Host ""
 
     # Build a fresh list on every render so numbering is always consistent
-    $items = [System.Collections.Generic.List[PSCustomObject]]::new()
+    # $items = [System.Collections.Generic.List[PSCustomObject]]::new()
+    $items = New-Object -TypeName System.Collections.ArrayList
     $i     = 1
 
     foreach ($sys in $systems) {
@@ -167,7 +168,10 @@ function Show-Menu {
 
             Write-Host ("  {0,2}.  {1}{2}" -f $i, $marker, $label) -ForegroundColor $color
 
-            $items.Add([PSCustomObject]@{ System = $sys; Client = $c })
+            # $items.Add([PSCustomObject]@{ System = $sys; Client = $c })
+            $obj = New-Object -TypeName PSObject -Property @{ System = $sys; Client = $c }
+            [void]$items.Add($obj)
+            
             $i++
             $anyShown = $true
         }
