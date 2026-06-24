@@ -1,11 +1,38 @@
-# SAP Quick Logon
+#Requires -Version 5.0
+<#
+.SYNOPSIS
+    SAP Quick Logon — launch SAP GUI sessions from a JSON system list without
+    manually filling the SAP Logon Pad every time.
+
+.DESCRIPTION
+    Reads system definitions from a JSON file, presents an interactive TUI menu,
+    and calls sapshcut.exe with the correct -guiparm / -system flags so the
+    connection string is built exactly the way SAP expects it.
+
+    Connection string logic (matches sapshcut.exe behaviour):
+      • No SAP Router  → -guiparm="/H/<host>/S/<port>"
+      • With SAP Router → -guiparm="<router>/H/<host>/S/<port>"
+
+    The -system flag carries the SID (e.g. H23), NOT the connection string.
+
+.NOTES
+    Backward-compatible with PowerShell 5.x (Windows PowerShell).
+    JSON path: %APPDATA%\SAP\Common\sap-systems.json
+#>
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
 $JsonFile = "$env:APPDATA\SAP\Common\sap-systems.json"
 
+# ---------------------------------------------------------------------------
+# Helper: Resolve a .lnk shortcut to its target executable path
+# ---------------------------------------------------------------------------
 function Get-PathFromShortcut {
     param([string]$LnkPath)
-
     try {
-        $shell = New-Object -ComObject WScript.Shell
+        $shell    = New-Object -ComObject WScript.Shell
         $shortcut = $shell.CreateShortcut($LnkPath)
         return $shortcut.TargetPath
     } catch {
@@ -13,8 +40,12 @@ function Get-PathFromShortcut {
     }
 }
 
+# ---------------------------------------------------------------------------
+# Helper: Locate sapshcut.exe using several discovery strategies
+# ---------------------------------------------------------------------------
 function Find-SapShcut {
-    # 1. Try common default install paths (64-bit and 32-bit)
+
+    # Strategy 1 — well-known default install paths (64-bit and 32-bit)
     $candidates = @(
         "${env:ProgramFiles}\SAP\FrontEnd\SAPgui\sapshcut.exe",
         "${env:ProgramFiles(x86)}\SAP\FrontEnd\SAPgui\sapshcut.exe"
@@ -22,27 +53,27 @@ function Find-SapShcut {
     $found = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
     if ($found) { return $found }
 
-    # 2. Resolve via Start Menu shortcut(s) under "SAP Front End"
+    # Strategy 2 — resolve via Start Menu shortcuts under "SAP Front End"
     $shortcutFolder = "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\SAP Front End"
     if (Test-Path $shortcutFolder) {
         $lnkFiles = Get-ChildItem -Path $shortcutFolder -Filter "*.lnk" -ErrorAction SilentlyContinue
-
         foreach ($lnk in $lnkFiles) {
             $targetPath = Get-PathFromShortcut -LnkPath $lnk.FullName
             if (-not $targetPath) { continue }
 
-            # If the shortcut itself points to sapshcut.exe, use it directly
-            if ($targetPath -match 'sapshcut\.exe$' -and (Test-Path $targetPath)) { return $targetPath }
+            # Shortcut may point directly to sapshcut.exe
+            if ($targetPath -match 'sapshcut\.exe$' -and (Test-Path $targetPath)) {
+                return $targetPath
+            }
 
-            # Otherwise, the shortcut likely points to saplogon.exe (or similar)
-            # sapshcut.exe normally lives in the same install folder
+            # Or it may point to saplogon.exe; sapshcut.exe lives in the same folder
             $installDir = Split-Path -Path $targetPath -Parent
-            $candidate = Join-Path $installDir "sapshcut.exe"
+            $candidate  = Join-Path $installDir "sapshcut.exe"
             if (Test-Path $candidate) { return $candidate }
         }
     }
 
-    # 3. Try registry (SAP GUI install path)
+    # Strategy 3 — registry (SAP GUI installer writes InstallDir here)
     $regPaths = @(
         "HKLM:\SOFTWARE\SAP\SAP Shared\SAPGUI Frontend",
         "HKLM:\SOFTWARE\WOW6432Node\SAP\SAP Shared\SAPGUI Frontend"
@@ -57,45 +88,38 @@ function Find-SapShcut {
         }
     }
 
-    # 4. Try PATH environment variable
+    # Strategy 4 — fall back to PATH
     $inPath = Get-Command "sapshcut.exe" -ErrorAction SilentlyContinue
     if ($inPath) { return $inPath.Source }
 
     return $null
 }
 
-$SapShcut = Find-SapShcut
-
-if (-not $SapShcut) {
-    Write-Host "  sapshcut.exe could not be found automatically." -ForegroundColor Red
-    Write-Host "  Please enter the full path to sapshcut.exe manually," -ForegroundColor Yellow
-    Write-Host "  or press Enter to exit." -ForegroundColor Yellow
-    $manualPath = Read-Host "  Path"
-
-    if (-not $manualPath -or -not (Test-Path $manualPath)) {
-        Write-Host "  Invalid path. Exiting." -ForegroundColor Red
-        exit 1
-    }
-    $SapShcut = $manualPath
-}
-
-if (-not (Test-Path $JsonFile)) {
-    Write-Host "  File not found: $JsonFile" -ForegroundColor Red
-    exit 1
-}
-
-$systems = Get-Content $JsonFile -Raw | ConvertFrom-Json
-
-function Build-ConnString {
+# ---------------------------------------------------------------------------
+# Helper: Build the -guiparm connection string for sapshcut.exe
+#
+#   Without router : /H/<host>/S/<port>
+#   With router    : <router>/H/<host>/S/<port>
+#
+# The router string already starts with /H/ (e.g. /H/azrap001.eastus2.cloudapp.azure.com),
+# so we simply prepend it — no extra separator is needed.
+# ---------------------------------------------------------------------------
+function Build-GuiParm {
     param($sys)
 
-    # Only prepend sapRouter when it actually has a value
+    $hostPart = "/H/$($sys.host)/S/$($sys.port)"
+
     if ($sys.sapRouter -and $sys.sapRouter.Trim() -ne "") {
-        return "$($sys.sapRouter)/H/$($sys.host)/S/$($sys.port)"
+        # Concatenate: <router>/H/<host>/S/<port>
+        return "$($sys.sapRouter.Trim())$hostPart"
     }
-    return "/H/$($sys.host)/S/$($sys.port)"
+
+    return $hostPart
 }
 
+# ---------------------------------------------------------------------------
+# Helper: Check whether a client value is in the system's favoriteClients list
+# ---------------------------------------------------------------------------
 function Test-IsFavoriteClient {
     param($sys, [string]$clientValue)
 
@@ -103,6 +127,10 @@ function Test-IsFavoriteClient {
     return $sys.favoriteClients -contains $clientValue
 }
 
+# ---------------------------------------------------------------------------
+# UI: Render the system/client selection menu
+#     Returns a fresh array of menu items (each entry = one system+client row)
+# ---------------------------------------------------------------------------
 function Show-Menu {
     param([string]$FilterText = "")
 
@@ -113,41 +141,40 @@ function Show-Menu {
     Write-Host "  ╚══════════════════════════════╝" -ForegroundColor Cyan
     Write-Host ""
 
-    $script:menuSystems = @()
-    # $script:menuClients = @()
-    $i = 1
+    # Build a fresh list on every render so numbering is always consistent
+    $items = [System.Collections.Generic.List[PSCustomObject]]::new()
+    $i     = 1
 
     foreach ($sys in $systems) {
-        $clients = if ($sys.client -is [array]) { $sys.client } else { @($sys.client) }
+        # Skip hidden systems
+        if ($sys.hidden -eq $true) { continue }
 
+        # Normalise client to array (JSON may have a single string value)
+        $clients  = if ($sys.client -is [array]) { $sys.client } else { @($sys.client) }
         $anyShown = $false
-
-	    if ($sys.hidden -eq $true) { continue }
 
         foreach ($c in $clients) {
             $label = "{0} [{1}]" -f $sys.name, $c
 
+            # Apply search filter (case-insensitive substring match)
             if ($FilterText -and ($label -notmatch [regex]::Escape($FilterText))) { continue }
 
-            $isFav = Test-IsFavoriteClient -sys $sys -clientValue $c
+            $isFav  = Test-IsFavoriteClient -sys $sys -clientValue $c
             $marker = if ($isFav) { "★ " } else { "  " }
             $color  = if ($isFav) { "Green" } else { "White" }
 
             Write-Host ("  {0,2}.  {1}{2}" -f $i, $marker, $label) -ForegroundColor $color
 
-            $script:menuItems += [PSCustomObject]@{ System = $sys; Client = $c }
-            # $script:menuSystems += $sys
-            # $script:menuClients += $c
-
+            $items.Add([PSCustomObject]@{ System = $sys; Client = $c })
             $i++
             $anyShown = $true
         }
 
-        # Blank line between systems for readability
+        # Visual separator between system groups
         if ($anyShown) { Write-Host "" }
     }
 
-    if ($script:menuItems.Count -eq 0) {
+    if ($items.Count -eq 0) {
         Write-Host "  (no matching systems)" -ForegroundColor DarkGray
         Write-Host ""
     }
@@ -156,26 +183,69 @@ function Show-Menu {
     Write-Host "   0.  Exit          /text = search" -ForegroundColor DarkGray
     Write-Host "  ──────────────────────────────" -ForegroundColor DarkGray
     Write-Host ""
+
+    return ,$items   # return as array (comma prefix prevents PS from unwrapping)
 }
+
+# ---------------------------------------------------------------------------
+# Startup: locate sapshcut.exe
+# ---------------------------------------------------------------------------
+
+$SapShcut = Find-SapShcut
+
+if (-not $SapShcut) {
+    Write-Host "  sapshcut.exe could not be found automatically." -ForegroundColor Red
+    Write-Host "  Please enter the full path to sapshcut.exe, or press Enter to exit." -ForegroundColor Yellow
+    $manualPath = Read-Host "  Path"
+
+    if (-not $manualPath -or -not (Test-Path $manualPath)) {
+        Write-Host "  Invalid path. Exiting." -ForegroundColor Red
+        exit 1
+    }
+    $SapShcut = $manualPath
+}
+
+# ---------------------------------------------------------------------------
+# Startup: load system definitions from JSON
+# ---------------------------------------------------------------------------
+
+if (-not (Test-Path $JsonFile)) {
+    Write-Host "  JSON file not found: $JsonFile" -ForegroundColor Red
+    exit 1
+}
+
+$systems = Get-Content $JsonFile -Raw | ConvertFrom-Json
+
+# ---------------------------------------------------------------------------
+# Main interaction loop
+# ---------------------------------------------------------------------------
 
 $filter = ""
 
 while ($true) {
-    Show-Menu -FilterText $filter
+    # Render menu and capture the ordered item list for this render pass
+    $menuItems = Show-Menu -FilterText $filter
 
-    $prompt = if ($filter) { "  Logon (filter: '$filter')" } else { "  Logon" }
-    $userInput = Read-Host $prompt
+    $prompt    = if ($filter) { "  Logon (filter: '$filter')" } else { "  Logon" }
+    $userInput = (Read-Host $prompt).Trim()
 
-    if ($userInput -match '^(0|q|exit)$') { Clear-Host; break }
+    # Exit commands
+    if ($userInput -match '^(0|q|exit)$') {
+        Clear-Host
+        break
+    }
 
-    # Type /text to filter, or / alone to clear the filter
+    # Filter command: /text sets filter, / alone clears it
     if ($userInput.StartsWith('/')) {
         $filter = $userInput.Substring(1).Trim()
         continue
     }
 
+    # Validate numeric selection
     $choiceNum = 0
-    if (-not [int]::TryParse($userInput, [ref]$choiceNum) -or $choiceNum -lt 1 -or $choiceNum -gt $menuItems.Count) {
+    if (-not [int]::TryParse($userInput, [ref]$choiceNum) `
+        -or $choiceNum -lt 1 `
+        -or $choiceNum -gt $menuItems.Count) {
         Write-Host "  Invalid choice." -ForegroundColor Red
         Start-Sleep -Seconds 1
         continue
@@ -185,19 +255,23 @@ while ($true) {
     $sys    = $item.System
     $client = $item.Client
 
-    # $connStr = Build-ConnString -sys $sys
-    $connStr = $sys.system
+    # Build the guiparm connection string (host/port + optional SAP Router prefix)
+    $guiParm = Build-GuiParm -sys $sys
 
+    # Assemble sapshcut.exe arguments
+    # -guiparm  : full RFC connection string (replaces the old -system for direct connections)
+    # -system   : SID, used by SAP for session title and system identification
+    # -maxgui   : start SAP GUI window maximized
     $argParts = @(
-        "-type=SAPGUI",
-        "-system=`"$connStr`"",
+        "-guiparm=`"$guiParm`"",
+        "-system=$($sys.system)",
         "-client=$client",
         "-user=`"$($sys.user)`"",
-        "-pw=`"$($sys.password)`""
-        # "–maxgui"
+        "-pw=`"$($sys.password)`"",
+        "-maxgui"
     )
 
-    # Language is optional
+    # Language is optional — only pass it when defined
     if ($sys.language -and $sys.language.Trim() -ne "") {
         $argParts += "-language=$($sys.language)"
     }
@@ -212,5 +286,6 @@ while ($true) {
         Write-Host ""
         Write-Host ("  Failed to launch {0}: {1}" -f $sys.name, $_.Exception.Message) -ForegroundColor Red
     }
+
     Start-Sleep -Milliseconds 800
 }
