@@ -189,12 +189,12 @@ while ($true) {
     $connStr = $sys.system
 
     $argParts = @(
-        # "-type=SAPGUI",
+        "-type=SAPGUI",
         "-system=`"$connStr`"",
         "-client=$client",
         "-user=`"$($sys.user)`"",
         "-pw=`"$($sys.password)`""
-        "–maxgui"
+        # "–maxgui"
     )
 
     # Language is optional
