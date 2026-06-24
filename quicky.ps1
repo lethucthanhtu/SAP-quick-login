@@ -2,7 +2,7 @@
 <#
 .SYNOPSIS
     SAP Quick Logon — launch SAP GUI sessions from a JSON system list without
-    manually filling the SAP Logon Pad every time.
+    manually filling the SAP Logon Pad every time. 
 
 .DESCRIPTION
     Reads system definitions from a JSON file, presents an interactive TUI menu,
