@@ -113,7 +113,8 @@ function Show-Menu {
     Write-Host "  ╚══════════════════════════════╝" -ForegroundColor Cyan
     Write-Host ""
 
-    $script:menuItems = @()
+    $script:menuSystems = @()
+    $script:menuClients = @()
     $i = 1
 
     foreach ($sys in $systems) {
@@ -121,7 +122,7 @@ function Show-Menu {
 
         $anyShown = $false
 
-	if ($sys.hidden -eq $true) { continue }
+	    if ($sys.hidden -eq $true) { continue }
 
         foreach ($c in $clients) {
             $label = "{0} [{1}]" -f $sys.name, $c
@@ -133,8 +134,11 @@ function Show-Menu {
             $color  = if ($isFav) { "Green" } else { "White" }
 
             Write-Host ("  {0,2}.  {1}{2}" -f $i, $marker, $label) -ForegroundColor $color
+
             # $script:menuItems += [PSCustomObject]@{ System = $sys; Client = $c }
-            $script:menuItems += [ordered]@{ System = $sys; Client = $c }
+            $script:menuSystems += $sys
+            $script:menuClients += $c
+            
             $i++
             $anyShown = $true
         }
