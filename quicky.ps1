@@ -260,13 +260,13 @@ while ($true) {
     # Build the guiparm connection string (host/port + optional SAP Router prefix)
     $guiParm = Build-GuiParm -sys $sys
 
-    # If the host is not configured, skip this system and continue to the next iteration
-    if (-not $guiParm) {
-        Write-Host "  Skipping $($sys.name): host is not configured." -ForegroundColor Yellow
-        Start-Sleep -Milliseconds 800
-        continue
-    }
-    
+    # # If the host is not configured, skip this system and continue to the next iteration
+    # if (-not $guiParm) {
+    #     Write-Host "  Skipping $($sys.name): host is not configured." -ForegroundColor Yellow
+    #     Start-Sleep -Milliseconds 800
+    #     continue
+    # }
+
     # Assemble sapshcut.exe arguments
     # -guiparm  : full RFC connection string (replaces the old -system for direct connections)
     # -system   : SID, used by SAP for session title and system identification
