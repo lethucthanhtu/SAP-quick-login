@@ -264,7 +264,7 @@ while ($true) {
     # Build the guiparm connection string (host/port + optional SAP Router prefix)
     $guiParm = Build-GuiParm -sys $sys
 
-    # # If the host is not configured, skip this system and continue to the next iteration
+    # # Check guiparm
     # if (-not $guiParm) {
     #     Write-Host "  Skipping $($sys.name): host is not configured." -ForegroundColor Yellow
     #     Start-Sleep -Milliseconds 800
