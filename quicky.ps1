@@ -114,7 +114,7 @@ function Show-Menu {
     Write-Host ""
 
     $script:menuSystems = @()
-    $script:menuClients = @()
+    # $script:menuClients = @()
     $i = 1
 
     foreach ($sys in $systems) {
@@ -135,10 +135,10 @@ function Show-Menu {
 
             Write-Host ("  {0,2}.  {1}{2}" -f $i, $marker, $label) -ForegroundColor $color
 
-            # $script:menuItems += [PSCustomObject]@{ System = $sys; Client = $c }
-            $script:menuSystems += $sys
-            $script:menuClients += $c
-            
+            $script:menuItems += [PSCustomObject]@{ System = $sys; Client = $c }
+            # $script:menuSystems += $sys
+            # $script:menuClients += $c
+
             $i++
             $anyShown = $true
         }
