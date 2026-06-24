@@ -145,7 +145,8 @@ function Show-Menu {
 
     # Build a fresh list on every render so numbering is always consistent
     # $items = [System.Collections.Generic.List[PSCustomObject]]::new()
-    $items = New-Object -TypeName System.Collections.ArrayList
+    # Plain array — the only collection type allowed in Constrained Language Mode
+    $items    = @()
     $i     = 1
 
     foreach ($sys in $systems) {
@@ -169,8 +170,9 @@ function Show-Menu {
             Write-Host ("  {0,2}.  {1}{2}" -f $i, $marker, $label) -ForegroundColor $color
 
             # $items.Add([PSCustomObject]@{ System = $sys; Client = $c })
-            $obj = New-Object -TypeName PSObject -Property @{ System = $sys; Client = $c }
-            $items.Add($obj)
+            # Store as hashtable — allowed in Constrained Language Mode
+            # PSCustomObject and New-Object are both blocked
+            $items += @{ System = $sys; Client = $c }
             
             $i++
             $anyShown = $true
