@@ -133,7 +133,8 @@ function Show-Menu {
             $color  = if ($isFav) { "Green" } else { "White" }
 
             Write-Host ("  {0,2}.  {1}{2}" -f $i, $marker, $label) -ForegroundColor $color
-            $script:menuItems += [PSCustomObject]@{ System = $sys; Client = $c }
+            # $script:menuItems += [PSCustomObject]@{ System = $sys; Client = $c }
+            $script:menuItems += [ordered]@{ System = $sys; Client = $c }
             $i++
             $anyShown = $true
         }
