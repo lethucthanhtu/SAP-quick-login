@@ -27,6 +27,20 @@
 $JsonFile = "$env:APPDATA\SAP\Common\sap-systems.json"
 
 # ---------------------------------------------------------------------------
+# Script-scope parallel arrays used by Show-Menu and the main loop.
+#
+# WHY PARALLEL ARRAYS instead of array-of-hashtables:
+#   Constrained Language Mode (common in corporate environments via GPO/AppLocker)
+#   blocks [PSCustomObject], New-Object, and generic types like List[T].
+#   Returning an array-of-hashtables from a function also causes a double-wrap
+#   bug: "return ,$items" makes $menuItems.Count = 1 always, so every choice
+#   resolves to the last item. Parallel script-scope arrays sidestep both issues
+#   entirely — no return value, no type restrictions.
+# ---------------------------------------------------------------------------
+$script:MenuSystems = @()   # parallel: SAP system object at index i
+$script:MenuClients = @()   # parallel: client string at index i
+
+# ---------------------------------------------------------------------------
 # Helper: Resolve a .lnk shortcut to its target executable path
 # ---------------------------------------------------------------------------
 function Get-PathFromShortcut {
@@ -107,6 +121,9 @@ function Find-SapShcut {
 function Build-GuiParm {
     param($sys)
 
+    # Cannot build a connection string without a host; return $null so the
+    # caller can detect the invalid state and skip or warn instead of passing
+    # an empty -guiparm argument to sapshcut.exe.
     if (-not $sys.host -or $sys.host.Trim() -eq "") { return $null }
 
     $hostPart = "/H/$($sys.host)/S/$($sys.port)"
@@ -130,8 +147,10 @@ function Test-IsFavoriteClient {
 }
 
 # ---------------------------------------------------------------------------
-# UI: Render the system/client selection menu
-#     Returns a fresh array of menu items (each entry = one system+client row)
+# UI: Render the system/client selection menu.
+#     Populates $script:MenuSystems and $script:MenuClients (parallel arrays)
+#     instead of returning a collection, avoiding all Constrained Language Mode
+#     type restrictions and the array double-wrap return bug.
 # ---------------------------------------------------------------------------
 function Show-Menu {
     param([string]$FilterText = "")
@@ -143,11 +162,10 @@ function Show-Menu {
     Write-Host "  ╚══════════════════════════════╝" -ForegroundColor Cyan
     Write-Host ""
 
-    # Build a fresh list on every render so numbering is always consistent
-    # $items = [System.Collections.Generic.List[PSCustomObject]]::new()
-    # Plain array — the only collection type allowed in Constrained Language Mode
-    $items    = @()
-    $i     = 1
+    # Reset parallel arrays on every render so numbering is always consistent
+    $script:MenuSystems = @()
+    $script:MenuClients = @()
+    $i = 1
 
     foreach ($sys in $systems) {
         # Skip hidden systems
@@ -169,11 +187,12 @@ function Show-Menu {
 
             Write-Host ("  {0,2}.  {1}{2}" -f $i, $marker, $label) -ForegroundColor $color
 
-            # $items.Add([PSCustomObject]@{ System = $sys; Client = $c })
-            # Store as hashtable — allowed in Constrained Language Mode
-            # PSCustomObject and New-Object are both blocked
-            $items += @{ System = $sys; Client = $c }
-            
+            # Store system and client at the same index in parallel arrays.
+            # Array-of-hashtables or PSCustomObject are avoided here because
+            # both are blocked in Constrained Language Mode.
+            $script:MenuSystems += $sys
+            $script:MenuClients += $c
+
             $i++
             $anyShown = $true
         }
@@ -182,7 +201,7 @@ function Show-Menu {
         if ($anyShown) { Write-Host "" }
     }
 
-    if ($items.Count -eq 0) {
+    if ($script:MenuSystems.Count -eq 0) {
         Write-Host "  (no matching systems)" -ForegroundColor DarkGray
         Write-Host ""
     }
@@ -191,8 +210,6 @@ function Show-Menu {
     Write-Host "   0.  Exit          /text = search" -ForegroundColor DarkGray
     Write-Host "  ──────────────────────────────" -ForegroundColor DarkGray
     Write-Host ""
-
-    return ,$items   # return as array (comma prefix prevents PS from unwrapping)
 }
 
 # ---------------------------------------------------------------------------
@@ -231,8 +248,8 @@ $systems = Get-Content $JsonFile -Raw | ConvertFrom-Json
 $filter = ""
 
 while ($true) {
-    # Render menu and capture the ordered item list for this render pass
-    $menuItems = Show-Menu -FilterText $filter
+    # Render menu — populates $script:MenuSystems and $script:MenuClients
+    Show-Menu -FilterText $filter
 
     $prompt    = if ($filter) { "  Logon (filter: '$filter')" } else { "  Logon" }
     $userInput = (Read-Host $prompt).Trim()
@@ -249,24 +266,24 @@ while ($true) {
         continue
     }
 
-    # Validate numeric selection
+    # Validate numeric selection against the parallel arrays populated by Show-Menu
     $choiceNum = 0
     if (-not [int]::TryParse($userInput, [ref]$choiceNum) `
         -or $choiceNum -lt 1 `
-        -or $choiceNum -gt $menuItems.Count) {
+        -or $choiceNum -gt $script:MenuSystems.Count) {
         Write-Host "  Invalid choice." -ForegroundColor Red
         Start-Sleep -Seconds 1
         continue
     }
 
-    $item   = $menuItems[$choiceNum - 1]
-    $sys    = $item.System
-    $client = $item.Client
+    # Retrieve system and client from parallel arrays using the same index
+    $sys    = $script:MenuSystems[$choiceNum - 1]
+    $client = $script:MenuClients[$choiceNum - 1]
 
     # Build the guiparm connection string (host/port + optional SAP Router prefix)
     $guiParm = Build-GuiParm -sys $sys
 
-    # # Check guiparm 
+    # # Check guiparm — skip launch if host is not configured in JSON
     # if (-not $guiParm) {
     #     Write-Host "  Skipping $($sys.name): host is not configured." -ForegroundColor Yellow
     #     Start-Sleep -Milliseconds 800
@@ -302,5 +319,5 @@ while ($true) {
         Write-Host ("  Failed to launch {0}: {1}" -f $sys.name, $_.Exception.Message) -ForegroundColor Red
     }
 
-    # Start-Sleep -Milliseconds 800 
+    Start-Sleep -Milliseconds 800
 }
