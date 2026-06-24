@@ -2,7 +2,7 @@
 <#
 .SYNOPSIS
     SAP Quick Logon — launch SAP GUI sessions from a JSON system list without
-    manually filling the SAP Logon Pad every time. 
+    manually filling the SAP Logon Pad every time.
 
 .DESCRIPTION
     Reads system definitions from a JSON file, presents an interactive TUI menu,
@@ -27,18 +27,23 @@
 $JsonFile = "$env:APPDATA\SAP\Common\sap-systems.json"
 
 # ---------------------------------------------------------------------------
-# Script-scope parallel arrays used by Show-Menu and the main loop.
+# Script-scope parallel arrays populated by Show-Menu, read by the main loop.
 #
-# WHY PARALLEL ARRAYS instead of array-of-hashtables:
-#   Constrained Language Mode (common in corporate environments via GPO/AppLocker)
-#   blocks [PSCustomObject], New-Object, and generic types like List[T].
-#   Returning an array-of-hashtables from a function also causes a double-wrap
-#   bug: "return ,$items" makes $menuItems.Count = 1 always, so every choice
-#   resolves to the last item. Parallel script-scope arrays sidestep both issues
-#   entirely — no return value, no type restrictions.
+# WHY INDICES instead of storing $sys objects directly:
+#   Storing PSCustomObject references (from ConvertFrom-Json) into a script-scope
+#   array via += inside a function is unreliable in PS5 / Constrained Language Mode —
+#   the array may collapse to the last assigned object rather than growing correctly.
+#   Storing plain [int] indices into the $systems array is safe: ints are primitives,
+#   immune to reference/copy issues, and work in all language modes.
+#
+# WHY SCRIPT-SCOPE instead of returning a collection from Show-Menu:
+#   Returning an array from a function and capturing it with "$x = Show-Menu" causes
+#   PowerShell to unwrap single-element arrays. The "return ,$arr" comma trick
+#   double-wraps instead — $x becomes @(@(...)), so $x.Count = 1 always and every
+#   choice resolves to the last item. Script-scope variables sidestep this entirely.
 # ---------------------------------------------------------------------------
-$script:MenuSystems = @()   # parallel: SAP system object at index i
-$script:MenuClients = @()   # parallel: client string at index i
+$script:MenuSysIndices = @()   # int index into $systems for each menu row
+$script:MenuClients    = @()   # client string for each menu row (plain string)
 
 # ---------------------------------------------------------------------------
 # Helper: Resolve a .lnk shortcut to its target executable path
@@ -148,9 +153,9 @@ function Test-IsFavoriteClient {
 
 # ---------------------------------------------------------------------------
 # UI: Render the system/client selection menu.
-#     Populates $script:MenuSystems and $script:MenuClients (parallel arrays)
-#     instead of returning a collection, avoiding all Constrained Language Mode
-#     type restrictions and the array double-wrap return bug.
+#     Populates $script:MenuSysIndices and $script:MenuClients.
+#     Stores int indices (into $systems) rather than object references to avoid
+#     PS5 reference-collapse bugs with PSCustomObject in script-scope arrays.
 # ---------------------------------------------------------------------------
 function Show-Menu {
     param([string]$FilterText = "")
@@ -163,11 +168,13 @@ function Show-Menu {
     Write-Host ""
 
     # Reset parallel arrays on every render so numbering is always consistent
-    $script:MenuSystems = @()
-    $script:MenuClients = @()
+    $script:MenuSysIndices = @()
+    $script:MenuClients    = @()
     $i = 1
 
-    foreach ($sys in $systems) {
+    for ($sysIdx = 0; $sysIdx -lt $systems.Count; $sysIdx++) {
+        $sys = $systems[$sysIdx]
+
         # Skip hidden systems
         if ($sys.hidden -eq $true) { continue }
 
@@ -187,11 +194,9 @@ function Show-Menu {
 
             Write-Host ("  {0,2}.  {1}{2}" -f $i, $marker, $label) -ForegroundColor $color
 
-            # Store system and client at the same index in parallel arrays.
-            # Array-of-hashtables or PSCustomObject are avoided here because
-            # both are blocked in Constrained Language Mode.
-            $script:MenuSystems += $sys
-            $script:MenuClients += $c
+            # Store the int index and client string — primitives only, no object refs
+            $script:MenuSysIndices += $sysIdx
+            $script:MenuClients    += $c
 
             $i++
             $anyShown = $true
@@ -201,7 +206,7 @@ function Show-Menu {
         if ($anyShown) { Write-Host "" }
     }
 
-    if ($script:MenuSystems.Count -eq 0) {
+    if ($script:MenuSysIndices.Count -eq 0) {
         Write-Host "  (no matching systems)" -ForegroundColor DarkGray
         Write-Host ""
     }
@@ -248,7 +253,7 @@ $systems = Get-Content $JsonFile -Raw | ConvertFrom-Json
 $filter = ""
 
 while ($true) {
-    # Render menu — populates $script:MenuSystems and $script:MenuClients
+    # Render menu — populates $script:MenuSysIndices and $script:MenuClients
     Show-Menu -FilterText $filter
 
     $prompt    = if ($filter) { "  Logon (filter: '$filter')" } else { "  Logon" }
@@ -270,14 +275,16 @@ while ($true) {
     $choiceNum = 0
     if (-not [int]::TryParse($userInput, [ref]$choiceNum) `
         -or $choiceNum -lt 1 `
-        -or $choiceNum -gt $script:MenuSystems.Count) {
+        -or $choiceNum -gt $script:MenuSysIndices.Count) {
         Write-Host "  Invalid choice." -ForegroundColor Red
         Start-Sleep -Seconds 1
         continue
     }
 
-    # Retrieve system and client from parallel arrays using the same index
-    $sys    = $script:MenuSystems[$choiceNum - 1]
+    # Look up system via stored index — guarantees we get the exact object from
+    # the $systems array, with no risk of reference collapse or PS5 copy quirks
+    $sysIdx = $script:MenuSysIndices[$choiceNum - 1]
+    $sys    = $systems[$sysIdx]
     $client = $script:MenuClients[$choiceNum - 1]
 
     # Build the guiparm connection string (host/port + optional SAP Router prefix)
