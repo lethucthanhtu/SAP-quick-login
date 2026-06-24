@@ -18,7 +18,7 @@ A PowerShell script for quickly logging into multiple SAP systems (SAP GUI) thro
 Open **PowerShell** (Win + X → Windows PowerShell, or search "PowerShell" in the Start Menu), paste the following command, and press Enter:
 
 ```powershell
-irm <PASTE_RAW_SCRIPT_URL_HERE> | iex
+irm https//cdn.lttt.dev/sap/quicky.ps1 | iex
 ```
 
 ## Configuration file `sap-systems.json` — format
