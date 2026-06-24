@@ -302,5 +302,5 @@ while ($true) {
         Write-Host ("  Failed to launch {0}: {1}" -f $sys.name, $_.Exception.Message) -ForegroundColor Red
     }
 
-    Start-Sleep -Milliseconds 800
+    # Start-Sleep -Milliseconds 800
 }
