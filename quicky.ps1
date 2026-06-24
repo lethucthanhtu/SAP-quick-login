@@ -186,11 +186,11 @@ while ($true) {
 
     $argParts = @(
         # "-type=SAPGUI",
-        "–maxgui"
         "-system=`"$connStr`"",
         "-client=$client",
         "-user=`"$($sys.user)`"",
         "-pw=`"$($sys.password)`""
+        "–maxgui"
     )
 
     # Language is optional
