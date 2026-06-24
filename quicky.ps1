@@ -107,6 +107,8 @@ function Find-SapShcut {
 function Build-GuiParm {
     param($sys)
 
+    if (-not $sys.host -or $sys.host.Trim() -eq "") { return $null }
+
     $hostPart = "/H/$($sys.host)/S/$($sys.port)"
 
     if ($sys.sapRouter -and $sys.sapRouter.Trim() -ne "") {
@@ -258,6 +260,13 @@ while ($true) {
     # Build the guiparm connection string (host/port + optional SAP Router prefix)
     $guiParm = Build-GuiParm -sys $sys
 
+    # If the host is not configured, skip this system and continue to the next iteration
+    if (-not $guiParm) {
+        Write-Host "  Skipping $($sys.name): host is not configured." -ForegroundColor Yellow
+        Start-Sleep -Milliseconds 800
+        continue
+    }
+    
     # Assemble sapshcut.exe arguments
     # -guiparm  : full RFC connection string (replaces the old -system for direct connections)
     # -system   : SID, used by SAP for session title and system identification
