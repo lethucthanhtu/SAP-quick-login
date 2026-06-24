@@ -181,10 +181,11 @@ while ($true) {
     $sys    = $item.System
     $client = $item.Client
 
-    $connStr = Build-ConnString -sys $sys
+    # $connStr = Build-ConnString -sys $sys
+    $connStr = $sys.system
 
     $argParts = @(
-        "-type=SAPGUI",
+        # "-type=SAPGUI",
         "-system=`"$connStr`"",
         "-client=$client",
         "-user=`"$($sys.user)`"",
