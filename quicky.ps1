@@ -317,14 +317,17 @@ while ($true) {
 
     $argString = $argParts -join " "
 
-    try {
-        Start-Process -FilePath $SapShcut -ArgumentList $argString -ErrorAction Stop
-        Write-Host ""
-        Write-Host ("  Launching {0} [{1}] ..." -f $sys.name, $client) -ForegroundColor Green
-    } catch {
-        Write-Host ""
-        Write-Host ("  Failed to launch {0}: {1}" -f $sys.name, $_.Exception.Message) -ForegroundColor Red
-    }
+    Write-Host $argString 
 
-    Start-Sleep -Milliseconds 800
+
+    # try {
+    #     Start-Process -FilePath $SapShcut -ArgumentList $argString -ErrorAction Stop
+    #     Write-Host ""
+    #     Write-Host ("  Launching {0} [{1}] ..." -f $sys.name, $client) -ForegroundColor Green
+    # } catch {
+    #     Write-Host ""
+    #     Write-Host ("  Failed to launch {0}: {1}" -f $sys.name, $_.Exception.Message) -ForegroundColor Red
+    # }
+
+    # Start-Sleep -Milliseconds 800
 }
