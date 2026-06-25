@@ -160,7 +160,7 @@ function Test-IsFavoriteClient {
 function Show-Menu {
     param([string]$FilterText = "")
 
-    # Clear-Host
+    Clear-Host
     Write-Host ""
     Write-Host "  ╔══════════════════════════════╗" -ForegroundColor Cyan
     Write-Host "  ║       SAP Quick Logon        ║" -ForegroundColor Cyan
@@ -271,11 +271,14 @@ while ($true) {
         continue
     }
 
-    # Validate numeric selection against the parallel arrays populated by Show-Menu
+    # Validate numeric selection against the parallel arrays populated by Show-Menu.
+    # [int]::TryParse and [ref] are both blocked in Constrained Language Mode,
+    # so we cast inside a try/catch instead — casting a non-numeric string throws,
+    # which we catch and treat as invalid input.
     $choiceNum = 0
-    if (-not [int]::TryParse($userInput, [ref]$choiceNum) `
-        -or $choiceNum -lt 1 `
-        -or $choiceNum -gt $script:MenuSysIndices.Count) {
+    try   { $choiceNum = [int]$userInput } catch { $choiceNum = 0 }
+
+    if ($choiceNum -lt 1 -or $choiceNum -gt $script:MenuSysIndices.Count) {
         Write-Host "  Invalid choice." -ForegroundColor Red
         Start-Sleep -Seconds 1
         continue
@@ -290,12 +293,12 @@ while ($true) {
     # Build the guiparm connection string (host/port + optional SAP Router prefix)
     $guiParm = Build-GuiParm -sys $sys
 
-    # # Check guiparm — skip launch if host is not configured in JSON
-    # if (-not $guiParm) {
-    #     Write-Host "  Skipping $($sys.name): host is not configured." -ForegroundColor Yellow
-    #     Start-Sleep -Milliseconds 800
-    #     continue
-    # }
+    # Check guiparm — skip launch if host is not configured in JSON
+    if (-not $guiParm) {
+        Write-Host "  Skipping $($sys.name): host is not configured." -ForegroundColor Yellow
+        Start-Sleep -Milliseconds 800
+        continue
+    }
 
     # Assemble sapshcut.exe arguments
     # -guiparm  : full RFC connection string (replaces the old -system for direct connections)
@@ -317,17 +320,14 @@ while ($true) {
 
     $argString = $argParts -join " "
 
-    Write-Host $argString 
+    try {
+        Start-Process -FilePath $SapShcut -ArgumentList $argString -ErrorAction Stop
+        Write-Host ""
+        Write-Host ("  Launching {0} [{1}] ..." -f $sys.name, $client) -ForegroundColor Green
+    } catch {
+        Write-Host ""
+        Write-Host ("  Failed to launch {0}: {1}" -f $sys.name, $_.Exception.Message) -ForegroundColor Red
+    }
 
-
-    # try {
-    #     Start-Process -FilePath $SapShcut -ArgumentList $argString -ErrorAction Stop
-    #     Write-Host ""
-    #     Write-Host ("  Launching {0} [{1}] ..." -f $sys.name, $client) -ForegroundColor Green
-    # } catch {
-    #     Write-Host ""
-    #     Write-Host ("  Failed to launch {0}: {1}" -f $sys.name, $_.Exception.Message) -ForegroundColor Red
-    # }
-
-    # Start-Sleep -Milliseconds 800
+    Start-Sleep -Milliseconds 800
 }
