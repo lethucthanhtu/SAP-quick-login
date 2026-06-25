@@ -160,7 +160,7 @@ function Test-IsFavoriteClient {
 function Show-Menu {
     param([string]$FilterText = "")
 
-    Clear-Host
+    # Clear-Host
     Write-Host ""
     Write-Host "  ╔══════════════════════════════╗" -ForegroundColor Cyan
     Write-Host "  ║       SAP Quick Logon        ║" -ForegroundColor Cyan
