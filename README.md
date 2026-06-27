@@ -1,6 +1,7 @@
 # SAP Quick Logon
 
 A PowerShell script for quickly logging into multiple SAP systems (SAP GUI) through a selection menu, without manually opening SAP Logon Pad.
+> Mainly use for system that not enable (or support) SSO
 
 ## Requirements
 
@@ -13,7 +14,7 @@ A PowerShell script for quickly logging into multiple SAP systems (SAP GUI) thro
 
   If this file does not exist, the script will report an error and will not create it automatically — you need to copy/create this file beforehand.
 
-## How to run (no download needed, no need to open a terminal first)
+## How to run (no download needed)
 
 Open **PowerShell** (Win + X → Windows PowerShell, or search "PowerShell" in the Start Menu), paste the following command, and press Enter:
 
@@ -34,21 +35,24 @@ irm https://cdn.lttt.dev/sap/quicky.ps1 | iex
     "host": "your_host",
     "port": "your_port",
     "language": "EN",
-    "sapRouter": "",
-    "favoriteClient": ["100", "120"]
-  }
+    "sapRouter": "your_sap_router",
+    "favoriteClient": ["100", "120"],
+    "hidden": false
+  },
+  ...
 ]
 ```
 
-| Field | Required | Notes |
-|---|---|---|
-| `client` | ✔ | Array of client numbers, or a single string |
-| `name` | ✔ | Display name shown in the menu |
-| `host`, `port` | ✔ | SAP connection details |
-| `user`, `password` | ✔ | Used for automatic login |
-| `language` | ✘ | Leave as `""` or omit the field if not needed |
-| `sapRouter` | ✘ | Leave as `""` if no router is used |
-| `favoriteClient` | ✘ | Array of client numbers to highlight in the menu, defaults to `[]` |
+| Field              | Required | Notes                                                              |
+|--------------------|----------|--------------------------------------------------------------------|
+| `client`           | ✔        | Array of client numbers, or a single string                        |
+| `name`             | ✔        | Display name shown in the menu                                     |
+| `user`, `password` | ✔        | Used for automatic login                                           |
+| `host`, `port`     | ✔        | SAP connection details                                             |
+| `language`         | ✘        | Leave as `""` or omit the field if not needed                      |
+| `sapRouter`        | ✘        | Leave as `""` if no router is used                                 |
+| `favoriteClient`   | ✘        | Array of client numbers to highlight in the menu, defaults to `[]` |
+| `hidden`           | ✘        | Boolean, hide system from list, default to `false`                 |
 
 ⚠️ **Security note**: passwords in this file are currently stored in plain text. Do not commit `sap-systems.json` to Git, and do not share this file over an unsecured channel.
 

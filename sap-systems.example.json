@@ -1,0 +1,15 @@
+[
+  {
+    "client": ["100", "110", "120"],
+    "name": "your_name",
+    "system": "system_id",
+    "user": "some_user",
+    "password": "some_password",
+    "host": "your_host",
+    "port": "your_port",
+    "language": "EN",
+    "sapRouter": "your_sap_router",
+    "favoriteClient": ["100", "120"],
+    "hidden": false
+  }
+]
