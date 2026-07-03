@@ -48,7 +48,8 @@ irm https://cdn.lttt.dev/sap/quicky.ps1 | iex
 | `client`           | ✔        | Array of client numbers, or a single string                        |
 | `name`             | ✔        | Display name shown in the menu                                     |
 | `user`, `password` | ✔        | Used for automatic login                                           |
-| `host`, `port`     | ✔        | SAP connection details                                             |
+| `host`             | ✔        | SAP connection details                                             |
+| `port`             | ✘        | SAP connection details                                             |
 | `language`         | ✘        | Leave as `""` or omit the field if not needed                      |
 | `sapRouter`        | ✘        | Leave as `""` if no router is used                                 |
 | `favoriteClient`   | ✘        | Array of client numbers to highlight in the menu, defaults to `[]` |
