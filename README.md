@@ -28,14 +28,14 @@ irm https://cdn.lttt.dev/sap/quicky.ps1 | iex
 [
   {
     "client": ["100", "110", "120"],
-    "name": "your_name",
+    "name": "display_name",
     "system": "system_id",
-    "user": "some_user",
-    "password": "some_password",
-    "host": "your_host",
-    "port": "your_port",
+    "user": "your_user",
+    "password": "your_password",
+    "host": "application_server",
+    "port": "system_port",
     "language": "EN",
-    "sapRouter": "your_sap_router",
+    "sapRouter": "sap_router",
     "favoriteClient": ["100", "120"],
     "hidden": false
   },
@@ -48,7 +48,7 @@ irm https://cdn.lttt.dev/sap/quicky.ps1 | iex
 | `client`           | ✔        | Array of client numbers, or a single string                        |
 | `name`             | ✔        | Display name shown in the menu                                     |
 | `user`, `password` | ✔        | Used for automatic login                                           |
-| `host`             | ✔        | SAP connection details                                             |
+| `host`             | ✔        | Application Server                                                 |
 | `port`             | ✘        | SAP connection details                                             |
 | `language`         | ✘        | Leave as `""` or omit the field if not needed                      |
 | `sapRouter`        | ✘        | Leave as `""` if no router is used                                 |
