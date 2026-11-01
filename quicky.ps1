@@ -313,9 +313,13 @@ while ($true) {
         "-system=$($sys.system)",
         "-client=$client",
         "-user=`"$($sys.user)`"",
-        "-pw=`"$($sys.password)`"",
         "-maxgui"
     )
+
+    # No password in the JSON: leave -pw out so SAP GUI asks for it at logon
+    if ($sys.password) {
+        $argParts += "-pw=`"$($sys.password)`""
+    }
 
     # Language is optional - only pass it when defined
     if ($sys.language -and $sys.language.Trim() -ne "") {
