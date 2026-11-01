@@ -1,7 +1,7 @@
 #Requires -Version 5.0
 <#
 .SYNOPSIS
-    SAP Quick Logon — launch SAP GUI sessions from a JSON system list without
+    SAP Quick Logon - launch SAP GUI sessions from a JSON system list without
     manually filling the SAP Logon Pad every time.
 
 .DESCRIPTION
@@ -10,8 +10,8 @@
     connection string is built exactly the way SAP expects it.
 
     Connection string logic (matches sapshcut.exe behaviour):
-      • No SAP Router  → -guiparm="/H/<host>/S/<port>"
-      • With SAP Router → -guiparm="<router>/H/<host>/S/<port>"
+      - No SAP Router  -> -guiparm="/H/<host>/S/<port>"
+      - With SAP Router -> -guiparm="<router>/H/<host>/S/<port>"
 
     The -system flag carries the SID (e.g. H23), NOT the connection string.
 
@@ -31,7 +31,7 @@ $JsonFile = "$env:APPDATA\SAP\Common\sap-systems.json"
 #
 # WHY INDICES instead of storing $sys objects directly:
 #   Storing PSCustomObject references (from ConvertFrom-Json) into a script-scope
-#   array via += inside a function is unreliable in PS5 / Constrained Language Mode —
+#   array via += inside a function is unreliable in PS5 / Constrained Language Mode -
 #   the array may collapse to the last assigned object rather than growing correctly.
 #   Storing plain [int] indices into the $systems array is safe: ints are primitives,
 #   immune to reference/copy issues, and work in all language modes.
@@ -39,7 +39,7 @@ $JsonFile = "$env:APPDATA\SAP\Common\sap-systems.json"
 # WHY SCRIPT-SCOPE instead of returning a collection from Show-Menu:
 #   Returning an array from a function and capturing it with "$x = Show-Menu" causes
 #   PowerShell to unwrap single-element arrays. The "return ,$arr" comma trick
-#   double-wraps instead — $x becomes @(@(...)), so $x.Count = 1 always and every
+#   double-wraps instead - $x becomes @(@(...)), so $x.Count = 1 always and every
 #   choice resolves to the last item. Script-scope variables sidestep this entirely.
 # ---------------------------------------------------------------------------
 $script:MenuSysIndices = @()   # int index into $systems for each menu row
@@ -64,7 +64,7 @@ function Get-PathFromShortcut {
 # ---------------------------------------------------------------------------
 function Find-SapShcut {
 
-    # Strategy 1 — well-known default install paths (64-bit and 32-bit)
+    # Strategy 1 - well-known default install paths (64-bit and 32-bit)
     $candidates = @(
         "${env:ProgramFiles}\SAP\FrontEnd\SAPgui\sapshcut.exe",
         "${env:ProgramFiles(x86)}\SAP\FrontEnd\SAPgui\sapshcut.exe"
@@ -72,7 +72,7 @@ function Find-SapShcut {
     $found = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
     if ($found) { return $found }
 
-    # Strategy 2 — resolve via Start Menu shortcuts under "SAP Front End"
+    # Strategy 2 - resolve via Start Menu shortcuts under "SAP Front End"
     $shortcutFolder = "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\SAP Front End"
     if (Test-Path $shortcutFolder) {
         $lnkFiles = Get-ChildItem -Path $shortcutFolder -Filter "*.lnk" -ErrorAction SilentlyContinue
@@ -92,7 +92,7 @@ function Find-SapShcut {
         }
     }
 
-    # Strategy 3 — registry (SAP GUI installer writes InstallDir here)
+    # Strategy 3 - registry (SAP GUI installer writes InstallDir here)
     $regPaths = @(
         "HKLM:\SOFTWARE\SAP\SAP Shared\SAPGUI Frontend",
         "HKLM:\SOFTWARE\WOW6432Node\SAP\SAP Shared\SAPGUI Frontend"
@@ -107,7 +107,7 @@ function Find-SapShcut {
         }
     }
 
-    # Strategy 4 — fall back to PATH
+    # Strategy 4 - fall back to PATH
     $inPath = Get-Command "sapshcut.exe" -ErrorAction SilentlyContinue
     if ($inPath) { return $inPath.Source }
 
@@ -121,7 +121,7 @@ function Find-SapShcut {
 #   With router    : <router>/H/<host>/S/<port>
 #
 # The router string already starts with /H/ (e.g. /H/azrap001.eastus2.cloudapp.azure.com),
-# so we simply prepend it — no extra separator is needed.
+# so we simply prepend it - no extra separator is needed.
 # ---------------------------------------------------------------------------
 function Build-GuiParm {
     param($sys)
@@ -162,9 +162,13 @@ function Show-Menu {
 
     Clear-Host
     Write-Host ""
-    Write-Host "  ╔══════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "  ║       SAP Quick Logon        ║" -ForegroundColor Cyan
-    Write-Host "  ╚══════════════════════════════╝" -ForegroundColor Cyan
+    # Glyphs come from code points so this file stays ASCII: Windows PowerShell 5.1 reads
+    # BOM-less files as ANSI, which turned these characters into quotes and broke parsing.
+    $bar  = [string][char]0x2550 * 30
+    $rule = "  " + [string][char]0x2500 * 30
+    Write-Host ("  {0}{1}{2}" -f [char]0x2554, $bar, [char]0x2557) -ForegroundColor Cyan
+    Write-Host ("  {0}       SAP Quick Logon        {0}" -f [char]0x2551) -ForegroundColor Cyan
+    Write-Host ("  {0}{1}{2}" -f [char]0x255A, $bar, [char]0x255D) -ForegroundColor Cyan
     Write-Host ""
 
     # Reset parallel arrays on every render so numbering is always consistent
@@ -189,12 +193,12 @@ function Show-Menu {
             if ($FilterText -and ($label -notmatch [regex]::Escape($FilterText))) { continue }
 
             $isFav  = Test-IsFavoriteClient -sys $sys -clientValue $c
-            $marker = if ($isFav) { "★ " } else { "  " }
+            $marker = if ($isFav) { "$([char]0x2605) " } else { "  " }
             $color  = if ($isFav) { "Green" } else { "White" }
 
             Write-Host ("  {0,2}.  {1}{2}" -f $i, $marker, $label) -ForegroundColor $color
 
-            # Store the int index and client string — primitives only, no object refs
+            # Store the int index and client string - primitives only, no object refs
             $script:MenuSysIndices += $sysIdx
             $script:MenuClients    += $c
 
@@ -211,9 +215,9 @@ function Show-Menu {
         Write-Host ""
     }
 
-    Write-Host "  ──────────────────────────────" -ForegroundColor DarkGray
+    Write-Host $rule -ForegroundColor DarkGray
     Write-Host "   0.  Exit          /text = search" -ForegroundColor DarkGray
-    Write-Host "  ──────────────────────────────" -ForegroundColor DarkGray
+    Write-Host $rule -ForegroundColor DarkGray
     Write-Host ""
 }
 
@@ -253,7 +257,7 @@ $systems = Get-Content $JsonFile -Raw | ConvertFrom-Json
 $filter = ""
 
 while ($true) {
-    # Render menu — populates $script:MenuSysIndices and $script:MenuClients
+    # Render menu - populates $script:MenuSysIndices and $script:MenuClients
     Show-Menu -FilterText $filter
 
     $prompt    = if ($filter) { "  Logon (filter: '$filter')" } else { "  Logon" }
@@ -273,7 +277,7 @@ while ($true) {
 
     # Validate numeric selection against the parallel arrays populated by Show-Menu.
     # [int]::TryParse and [ref] are both blocked in Constrained Language Mode,
-    # so we cast inside a try/catch instead — casting a non-numeric string throws,
+    # so we cast inside a try/catch instead - casting a non-numeric string throws,
     # which we catch and treat as invalid input.
     $choiceNum = 0
     try   { $choiceNum = [int]$userInput } catch { $choiceNum = 0 }
@@ -284,7 +288,7 @@ while ($true) {
         continue
     }
 
-    # Look up system via stored index — guarantees we get the exact object from
+    # Look up system via stored index - guarantees we get the exact object from
     # the $systems array, with no risk of reference collapse or PS5 copy quirks
     $sysIdx = $script:MenuSysIndices[$choiceNum - 1]
     $sys    = $systems[$sysIdx]
@@ -293,7 +297,7 @@ while ($true) {
     # Build the guiparm connection string (host/port + optional SAP Router prefix)
     $guiParm = Build-GuiParm -sys $sys
 
-    # Check guiparm — skip launch if host is not configured in JSON
+    # Check guiparm - skip launch if host is not configured in JSON
     if (-not $guiParm) {
         Write-Host "  Skipping $($sys.name): host is not configured." -ForegroundColor Yellow
         Start-Sleep -Milliseconds 800
@@ -313,7 +317,7 @@ while ($true) {
         "-maxgui"
     )
 
-    # Language is optional — only pass it when defined
+    # Language is optional - only pass it when defined
     if ($sys.language -and $sys.language.Trim() -ne "") {
         $argParts += "-language=$($sys.language)"
     }
