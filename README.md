@@ -6,6 +6,7 @@ A PowerShell script for quickly logging into multiple SAP systems (SAP GUI) thro
 ## Requirements
 
 - Windows with SAP GUI installed (the script auto-detects `sapshcut.exe`).
+- Windows PowerShell 5.1 or PowerShell 7+.
 - A configuration file `sap-systems.json` located at:
   ```
   %APPDATA%\SAP\Common\sap-systems.json
@@ -21,6 +22,20 @@ Open **PowerShell** (Win + X → Windows PowerShell, or search "PowerShell" in t
 ```powershell
 irm https://cdn.lttt.dev/sap/quicky.ps1 | iex
 ```
+
+`irm | iex` runs whatever the server returns at that moment. To review it first, download it,
+read it, then run the local copy:
+
+```powershell
+irm https://cdn.lttt.dev/sap/quicky.ps1 -OutFile quicky.ps1
+notepad .\quicky.ps1
+Get-FileHash .\quicky.ps1 -Algorithm SHA256   # compare with the reviewed commit on GitHub
+powershell -ExecutionPolicy Bypass -File .\quicky.ps1
+```
+
+Or pin to a reviewed commit:
+`irm https://raw.githubusercontent.com/lethucthanhtu/SAP-quick-login/<commit>/quicky.ps1 | iex`.
+See [SECURITY.md](./SECURITY.md).
 
 ## Configuration file `sap-systems.json` — format
 
@@ -47,7 +62,8 @@ irm https://cdn.lttt.dev/sap/quicky.ps1 | iex
 |--------------------|----------|--------------------------------------------------------------------|
 | `client`           | ✔        | Array of client numbers, or a single string                        |
 | `name`             | ✔        | Display name shown in the menu                                     |
-| `user`, `password` | ✔        | Used for automatic login                                           |
+| `user`             | ✔        | SAP user name                                                      |
+| `password`         | ✘        | Leave as `""` or omit it and SAP GUI will ask for it (recommended)  |
 | `host`             | ✔        | Application Server                                                 |
 | `port`             | ✘        | SAP connection details                                             |
 | `language`         | ✘        | Leave as `""` or omit the field if not needed                      |
@@ -55,7 +71,15 @@ irm https://cdn.lttt.dev/sap/quicky.ps1 | iex
 | `favoriteClient`   | ✘        | Array of client numbers to highlight in the menu, defaults to `[]` |
 | `hidden`           | ✘        | Boolean, hide system from list, default to `false`                 |
 
-⚠️ **Security note**: passwords in this file are currently stored in plain text. Do not commit `sap-systems.json` to Git, and do not share this file over an unsecured channel.
+⚠️ **Security note**: a `password` in this file is stored in plain text, and it is passed to
+`sapshcut.exe` as `-pw=...` on the command line, where other programs running as your user can
+read it. Prefer leaving `password` empty (SAP GUI then asks for it) or using SSO where your
+system supports it. Never commit `sap-systems.json` to Git or share it.
+
+## Uninstall
+
+Nothing is installed. Delete `%APPDATA%\SAP\Common\sap-systems.json` (it may contain passwords)
+and any downloaded copy of `quicky.ps1`.
 
 ## Using the menu
 
