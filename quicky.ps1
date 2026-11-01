@@ -147,8 +147,8 @@ function Build-GuiParm {
 function Test-IsFavoriteClient {
     param($sys, [string]$clientValue)
 
-    if (-not $sys.favoriteClients) { return $false }
-    return $sys.favoriteClients -contains $clientValue
+    # README and the example use "favoriteClient"; "favoriteClients" is still accepted
+    return (@($sys.favoriteClient) + @($sys.favoriteClients)) -contains $clientValue
 }
 
 # ---------------------------------------------------------------------------
